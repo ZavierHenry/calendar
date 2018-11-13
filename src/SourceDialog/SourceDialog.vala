@@ -19,7 +19,7 @@
  *              Corentin Noël <corentin@elementaryos.org>
  */
 
-public class Maya.View.SourceDialog : Gtk.Grid {
+public class Maya.View.SourceDialog : Gtk.Dialog {
     public EventType event_type { get; private set; default=EventType.EDIT;}
 
     private Gtk.Entry name_entry;
@@ -34,22 +34,10 @@ public class Maya.View.SourceDialog : Gtk.Grid {
     private Gtk.ListStore list_store;
     private E.Source source = null;
 
-    public signal void go_back ();
-
     construct {
+        deletable = false;
+
         widgets_checked = new Gee.HashMap<string, bool> (null, null);
-
-        var cancel_button = new Gtk.Button.with_label (_("Cancel"));
-        create_button = new Gtk.Button.with_label (_("Create"));
-
-        create_button.clicked.connect (save);
-        cancel_button.clicked.connect (() => go_back ());
-
-        var buttonbox = new Gtk.ButtonBox (Gtk.Orientation.HORIZONTAL);
-        buttonbox.layout_style = Gtk.ButtonBoxStyle.END;
-        buttonbox.spacing = 6;
-        buttonbox.pack_end (cancel_button);
-        buttonbox.pack_end (create_button);
 
         var name_label = new Gtk.Label (_("Name:"));
         name_label.xalign = 1;
@@ -114,6 +102,7 @@ public class Maya.View.SourceDialog : Gtk.Grid {
         });
 
         main_grid = new Gtk.Grid ();
+        main_grid.margin_start = main_grid.margin_end = 12;
         main_grid.row_spacing = 6;
         main_grid.column_spacing = 12;
         main_grid.attach (type_label,    0, 0, 1, 1);
@@ -123,41 +112,33 @@ public class Maya.View.SourceDialog : Gtk.Grid {
         main_grid.attach (color_label,   0, 2, 1, 1);
         main_grid.attach (color_button,  1, 2, 1, 1);
         main_grid.attach (check_button,  1, 3, 1, 1);
+        main_grid.show_all ();
 
-        margin = 12;
-        margin_bottom = 8;
-        row_spacing = 24;
-        attach (main_grid, 0, 0);
-        attach (buttonbox, 0, 1);
+        get_content_area ().add (main_grid);
 
-        show_all ();
+        var cancel_button = (Gtk.Button) add_button (_("Cancel"), Gtk.ResponseType.CANCEL);
+        create_button = (Gtk.Button) add_button (_("Create"), Gtk.ResponseType.APPLY);
+
+        create_button.clicked.connect (save);
+        cancel_button.clicked.connect (() => destroy ());
+
+        var action_area = get_action_area ();
+        action_area.margin = 6;
+        action_area.margin_top = 14;
     }
 
-    public void set_source (E.Source? source = null) {
+    public void set_source (E.Source source) {
         this.source = source;
-        if (source == null) {
-            event_type = EventType.ADD;
-            name_entry.text = "";
-            type_combobox.sensitive = true;
-            create_button.set_label (_("Create Calendar"));
-            var rgba = Gdk.RGBA ();
-            rgba.red = 0.13;
-            rgba.green = 0.42;
-            rgba.blue = 0.70;
-            rgba.alpha = 1;
-            color_button.set_rgba (rgba);
-        } else {
-            event_type = EventType.EDIT;
-            create_button.set_label (_("Save"));
-            name_entry.text = source.display_name;
-            type_combobox.sensitive = false;
-            type_combobox.set_active (0);
-            list_store.foreach (tree_foreach);
-            var cal = (E.SourceCalendar)source.get_extension (E.SOURCE_EXTENSION_CALENDAR);
-            var rgba = Gdk.RGBA ();
-            rgba.parse (cal.dup_color ());
-            color_button.set_rgba (rgba);
-        }
+        event_type = EventType.EDIT;
+        create_button.set_label (_("Save"));
+        name_entry.text = source.display_name;
+        type_combobox.sensitive = false;
+        type_combobox.set_active (0);
+        list_store.foreach (tree_foreach);
+        var cal = (E.SourceCalendar)source.get_extension (E.SOURCE_EXTENSION_CALENDAR);
+        var rgba = Gdk.RGBA ();
+        rgba.parse (cal.dup_color ());
+        color_button.set_rgba (rgba);
     }
 
     private bool tree_foreach (Gtk.TreeModel model, Gtk.TreePath path, Gtk.TreeIter iter) {
@@ -221,10 +202,10 @@ public class Maya.View.SourceDialog : Gtk.Grid {
     public void save () {
         if (event_type == EventType.ADD) {
             current_backend.add_new_calendar (name_entry.text, Util.get_hexa_color (color_button.rgba), set_as_default, backend_widgets);
-            go_back ();
         } else {
             current_backend.modify_calendar (name_entry.text, Util.get_hexa_color (color_button.rgba), set_as_default, backend_widgets, source);
-            go_back ();
         }
+
+        destroy ();
     }
 }
